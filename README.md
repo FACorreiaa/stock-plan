@@ -346,4 +346,16 @@ Use in both Vapor routes and SwiftUI views—no duplication, no sync issues.
 ## License
 
 This project is for personal use. Modify and extend as needed for your stock tracking needs.
-# stock-plan
+
+  ibkr-gateway:
+    # Replace with your preferred IBKR Gateway image.
+    image: ibkr-gateway:latest
+    environment:
+      TZ: ${TZ:-UTC}
+      IBKR_USERNAME: ${IBKR_USERNAME:-}
+      IBKR_PASSWORD: ${IBKR_PASSWORD:-}
+      IBKR_MODE: ${IBKR_MODE:-paper}
+    ports:
+      - '4001:4001'
+      - '4002:4002'
+    restart: unless-stopped

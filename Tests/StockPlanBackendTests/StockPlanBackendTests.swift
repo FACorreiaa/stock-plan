@@ -19,6 +19,23 @@ struct StockPlanBackendTests {
         }
         try await app.asyncShutdown()
     }
+
+    private func registerTestUser(app: Application) async throws -> (token: String, userId: UUID) {
+        let register = AuthRegisterRequest(email: "test@example.com", password: "Password123")
+        var response: AuthResponse?
+
+        try await app.testing().test(.POST, "auth/register", beforeRequest: { req in
+            try req.content.encode(register)
+        }, afterResponse: { res async throws in
+            #expect(res.status == .ok)
+            response = try res.content.decode(AuthResponse.self)
+        })
+
+        guard let response else {
+            throw Abort(.internalServerError, reason: "Auth register did not return a response")
+        }
+        return (response.token, response.userId)
+    }
     
     @Test("Test Hello World Route")
     func helloWorld() async throws {
@@ -33,14 +50,20 @@ struct StockPlanBackendTests {
     @Test("Getting all the Todos")
     func getAllTodos() async throws {
         try await withApp { app in
-            let sampleTodos = [Todo(title: "sample1"), Todo(title: "sample2")]
+            let (token, userId) = try await registerTestUser(app: app)
+            let sampleTodos = [
+                Todo(userId: userId, title: "sample1"),
+                Todo(userId: userId, title: "sample2"),
+            ]
             try await sampleTodos.create(on: app.db)
             
-            try await app.testing().test(.GET, "todos", afterResponse: { res async throws in
+            try await app.testing().test(.GET, "todos", beforeRequest: { req in
+                req.headers.bearerAuthorization = .init(token: token)
+            }, afterResponse: { res async throws in
                 #expect(res.status == .ok)
                 #expect(try
-                    res.content.decode([TodoDTO].self).sorted(by: { ($0.title ?? "") < ($1.title ?? "") }) ==
-                    sampleTodos.map { $0.toDTO() }.sorted(by: { ($0.title ?? "") < ($1.title ?? "") })
+                    res.content.decode([TodoDTO].self).sorted(by: { $0.title < $1.title }) ==
+                    sampleTodos.map { $0.toDTO() }.sorted(by: { $0.title < $1.title })
                 )
             })
         }
@@ -51,7 +74,10 @@ struct StockPlanBackendTests {
         let newDTO = TodoDTO(id: nil, title: "test")
         
         try await withApp { app in
+            let (token, _) = try await registerTestUser(app: app)
+
             try await app.testing().test(.POST, "todos", beforeRequest: { req in
+                req.headers.bearerAuthorization = .init(token: token)
                 try req.content.encode(newDTO)
             }, afterResponse: { res async throws in
                 #expect(res.status == .ok)
@@ -63,12 +89,14 @@ struct StockPlanBackendTests {
     
     @Test("Deleting a Todo")
     func deleteTodo() async throws {
-        let testTodos = [Todo(title: "test1"), Todo(title: "test2")]
-        
         try await withApp { app in
+            let (token, userId) = try await registerTestUser(app: app)
+            let testTodos = [Todo(userId: userId, title: "test1"), Todo(userId: userId, title: "test2")]
             try await testTodos.create(on: app.db)
             
-            try await app.testing().test(.DELETE, "todos/\(testTodos[0].requireID())", afterResponse: { res async throws in
+            try await app.testing().test(.DELETE, "todos/\(testTodos[0].requireID())", beforeRequest: { req in
+                req.headers.bearerAuthorization = .init(token: token)
+            }, afterResponse: { res async throws in
                 #expect(res.status == .noContent)
                 let model = try await Todo.find(testTodos[0].id, on: app.db)
                 #expect(model == nil)

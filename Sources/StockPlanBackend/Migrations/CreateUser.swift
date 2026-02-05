@@ -1,17 +1,18 @@
 import Fluent
 
-struct CreateTodo: AsyncMigration {
+struct CreateUser: AsyncMigration {
     func prepare(on database: any Database) async throws {
-        try await database.schema("todos")
+        try await database.schema("users")
             .id()
-            .field("user_id", .uuid, .required, .references("users", "id", onDelete: .cascade))
-            .field("title", .string, .required)
+            .field("email", .string, .required)
+            .field("password_hash", .string, .required)
             .field("created_at", .datetime, .required)
             .field("updated_at", .datetime)
+            .unique(on: "email")
             .create()
     }
 
     func revert(on database: any Database) async throws {
-        try await database.schema("todos").delete()
+        try await database.schema("users").delete()
     }
 }
