@@ -56,8 +56,7 @@ Built for deployment on budget VPS instances like Hetzner's CPX11 ($5/month), th
 - **Due Diligence Notes**: Thesis, risks, catalysts, and reference links per stock
 - **Targets**: Base/bear/bull price targets with dates and rationale
 - **Market Data**: Quotes and daily history from external APIs with caching
-- **Broker Sync v1**: Read-only import to seed holdings (manual/CSV fallback)
-- **RESTful API**: JSON endpoints for iOS and macOS clients
+- **Broker Sync v1 (CSV Import)**: Export from your broker, then import the CSV in the app to update holdings/watchlist (read-only; no trading)
 
 ### Planned Extensions
 - **Real-Time Updates**: WebSocket support for live price streaming
@@ -117,6 +116,7 @@ Built for deployment on budget VPS instances like Hetzner's CPX11 ($5/month), th
 - `POST /brokers/connect` - Start broker connection flow
 - `GET /brokers` - List connected brokers
 - `POST /brokers/import` - Import holdings (read-only)
+- `POST /brokers/import/csv` - Import holdings from CSV (Content-Type: text/csv)
 - `GET /brokers/holdings` - List imported holdings
 
 ### Market Data
@@ -127,6 +127,68 @@ Built for deployment on budget VPS instances like Hetzner's CPX11 ($5/month), th
 ### Portfolio Analytics
 - `GET /portfolio/summary` - Total value, gains/losses, allocation
 - `GET /portfolio/performance` - Historical performance metrics
+
+## CSV Import (MVP): Export from Broker, Import from App
+
+Enable users to keep their StockPlan portfolio in sync by exporting holdings from their broker as a CSV file and importing it directly in the app.
+
+### How it works
+1. Export from your broker
+   - In your broker platform, export your current positions/holdings as a CSV.
+   - Include at minimum: symbol/ticker and quantity (shares).
+   - If available, also include: average cost (buy price) and first purchase date.
+   - Save the file to your device (Files/iCloud/Downloads).
+2. Import from the app
+   - In the StockPlan app, go to Settings → Import from Broker (CSV).
+   - Select the CSV file. You'll see a quick preview and header mapping.
+   - Confirm to upload; the backend validates rows and upserts holdings.
+
+### Accepted CSV format
+- Header row required. Header names are case-insensitive; underscores/spaces are ignored.
+- Recognized columns (any of the aliases below are accepted):
+  - symbol: "symbol", "ticker`
+  - shares: "shares", "quantity", "qty`
+  - buy_price: "buy_price", "average_cost", "avg_cost", "cost_basis`
+  - buy_date: "buy_date", "purchase_date", "opened`
+  - notes (optional)
+- Dates: YYYY-MM-DD (e.g., 2024-11-15).
+- Numbers: use dot as decimal separator (e.g., 1234.56).
+- Extra columns are ignored.
+
+Example:
+
+"""
+symbol,shares,buy_price,buy_date,notes
+AAPL,12,145.30,2023-04-18,Long-term core
+MSFT,5,320.00,2024-01-10,
+NVDA,2,,,
+"""
+
+### Import behavior
+- Upsert by (user, symbol):
+  - If a holding with the same symbol exists, its shares/buy price/date are updated.
+  - If not, a new holding is created.
+- Rows with only a symbol (no shares) can be used to populate your watchlist.
+- Invalid rows are skipped and reported back with reasons (e.g., missing symbol).
+
+### API (for clients)
+- Endpoint: `POST /brokers/import/csv`
+- Headers: `Authorization: Bearer <token>`, `Content-Type: text/csv`
+- Body: raw CSV content.
+
+cURL example:
+
+"""
+curl -X POST \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: text/csv" \
+  --data-binary @holdings.csv \
+  http://localhost:8080/brokers/import/csv
+"""
+
+### Privacy & safety
+- Read-only import: no trading or broker credentials required.
+- Only the data you upload (symbols, quantities, prices) is processed.
 
 ## Getting Started
 
@@ -141,221 +203,4 @@ Built for deployment on budget VPS instances like Hetzner's CPX11 ($5/month), th
 ```bash
 git clone <repository-url>
 cd StockPlanBackend
-```
 
-2. Configure environment variables (create `.env.development`):
-```bash
-DATABASE_URL=postgres://user:password@localhost/stockplan
-JWT_SECRET=your-secret-key-here
-STOCK_API_KEY=your-alpha-vantage-key
-```
-
-3. Build the project:
-```bash
-swift build
-```
-
-4. Run database migrations:
-```bash
-swift run Run migrate
-```
-
-5. Start the server:
-```bash
-swift run
-```
-
-The server will start on `http://localhost:8080` by default.
-
-### Development Commands
-
-Run the server with auto-reload during development:
-```bash
-swift run Run serve --auto-reload
-```
-
-Execute tests:
-```bash
-swift test
-```
-
-Revert last database migration:
-```bash
-swift run Run migrate --revert
-```
-
-## Deployment
-
-### Docker Deployment (Recommended)
-
-1. Build the Docker image:
-```bash
-docker build -t stockplan-backend .
-```
-
-2. Run with environment variables:
-```bash
-docker run -p 8080:8080 \
-  -e DATABASE_URL=postgres://... \
-  -e JWT_SECRET=... \
-  -e STOCK_API_KEY=... \
-  stockplan-backend
-```
-
-### Hetzner VPS Setup
-
-The backend is optimized for Hetzner's CPX11 instance (2 vCPUs, 2 GB RAM, €4.99/month):
-
-1. **Resource Efficiency**: Vapor uses ~10-50 MB RAM idle, ~100 MB under load
-2. **Storage**: Binary size ~20-50 MB, plenty of room on 40 GB SSD
-3. **Network**: Handles 50-80k req/s in benchmarks, suitable for personal/small-scale use
-4. **HTTPS**: Configure with Let's Encrypt for free SSL certificates
-
-Deploy using Docker Compose with PostgreSQL:
-```bash
-docker-compose up -d
-```
-
-Monitor resource usage:
-```bash
-docker stats
-```
-
-## Performance Considerations
-
-### Vapor vs. Go on Budget VPS
-- **RAM**: Vapor uses 10-30% more than equivalent Go apps, but both fit easily in 2 GB
-- **CPU**: Go is 20-50% more efficient under high load, but Vapor handles typical personal app traffic well
-- **Throughput**: Vapor achieves 50-80k req/s vs. Go's 100k+, more than sufficient for <1,000 daily users
-- **Binary Size**: Vapor binaries are 10-50 MB vs. Go's 5-20 MB (negligible on 40 GB disk)
-
-**Verdict**: For this personal project, Vapor's benefits (full-stack Swift, type safety, code sharing with mobile app) outweigh Go's marginal efficiency gains. The $5 Hetzner server has plenty of headroom for both.
-
-## Database Schema
-
-### Users
-- `id` (UUID, primary key)
-- `email` (String, unique)
-- `password_hash` (String)
-- `created_at` (Date)
-
-### Stocks
-- `id` (UUID, primary key)
-- `user_id` (UUID, foreign key)
-- `symbol` (String, e.g., "AAPL")
-- `shares` (Double)
-- `buy_price` (Double)
-- `buy_date` (Date)
-- `notes` (String, optional)
-- `created_at` (Date)
-- `updated_at` (Date)
-
-### Price History (Cached)
-- `id` (UUID, primary key)
-- `symbol` (String, indexed)
-- `date` (Date, indexed)
-- `open`, `high`, `low`, `close` (Double)
-- `volume` (Int)
-
-## External API Integration
-
-The backend fetches stock data from free/freemium APIs:
-
-### Alpha Vantage (Recommended)
-- Free tier: 25 requests/day
-- 5/10 year historical data via `TIME_SERIES_DAILY`
-- Current quotes via `GLOBAL_QUOTE`
-
-### Yahoo Finance (Alternative)
-- Unofficial API via HTTP requests
-- No key required, but rate-limited
-- Broader international stock coverage
-
-Implement caching to minimize API calls:
-- Store daily prices in database
-- Update once per day via scheduled Vapor task
-- Serve cached data to mobile app
-
-## Security
-
-- **JWT Tokens**: Expire after 7 days, stored securely on mobile (Keychain)
-- **Password Hashing**: Use BCrypt via Vapor's crypto utilities
-- **HTTPS**: Required for production deployment
-- **Rate Limiting**: Prevent abuse with Vapor middleware (e.g., 100 req/min per IP)
-- **Input Validation**: Validate stock symbols, numeric fields server-side
-
-## Mobile App Integration
-
-This backend pairs with a SwiftUI mobile app. Shared code via Swift Package Manager:
-
-```swift
-// Shared package: StockModels
-public struct Stock: Codable {
-    public let id: UUID?
-    public let symbol: String
-    public let shares: Double
-    public let buyPrice: Double
-    public let buyDate: Date
-    public let notes: String?
-}
-```
-
-Use in both Vapor routes and SwiftUI views—no duplication, no sync issues.
-
-## Roadmap
-
-### Phase 1: MVP (4-6 weeks)
-- [x] Basic Vapor project setup
-- [ ] User authentication (register/login)
-- [ ] Portfolio and watchlist CRUD endpoints
-- [ ] Due diligence notes model and CRUD endpoints
-- [ ] Base/bear/bull targets model and CRUD endpoints
-- [ ] Market data integration (quotes + daily history) with caching
-- [ ] Broker connection v1 (read-only import or CSV fallback)
-- [ ] PostgreSQL/SQLite database setup
-
-### Phase 2: Enhanced Features (1-2 weeks)
-- [ ] Historical data fetching and caching
-- [ ] Portfolio summary/analytics endpoints
-- [ ] Scheduled tasks for daily price updates
-- [ ] Docker deployment configuration
-
-### Phase 3: Advanced Features (Ongoing)
-- [ ] WebSocket support for real-time prices
-- [ ] APNS integration for price alerts
-- [ ] Paper trading simulator
-- [ ] News/RSS feed integration
-- [ ] Multi-currency support
-
-## Resources
-
-### Vapor
-- [Vapor Documentation](https://docs.vapor.codes)
-- [Vapor GitHub](https://github.com/vapor/vapor)
-- [Vapor Community](https://github.com/vapor-community)
-
-### Stock APIs
-- [Alpha Vantage](https://www.alphavantage.co/documentation/)
-- [Yahoo Finance (unofficial)](https://github.com/ranaroussi/yfinance)
-
-### Deployment
-- [Hetzner Cloud](https://www.hetzner.com/cloud)
-- [Docker with Vapor](https://docs.vapor.codes/deploy/docker/)
-- [Let's Encrypt SSL](https://letsencrypt.org/)
-
-## License
-
-This project is for personal use. Modify and extend as needed for your stock tracking needs.
-
-  ibkr-gateway:
-    # Replace with your preferred IBKR Gateway image.
-    image: ibkr-gateway:latest
-    environment:
-      TZ: ${TZ:-UTC}
-      IBKR_USERNAME: ${IBKR_USERNAME:-}
-      IBKR_PASSWORD: ${IBKR_PASSWORD:-}
-      IBKR_MODE: ${IBKR_MODE:-paper}
-    ports:
-      - '4001:4001'
-      - '4002:4002'
-    restart: unless-stopped

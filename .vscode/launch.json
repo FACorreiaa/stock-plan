@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:StockPlanBackend}",
+            "name": "Debug StockPlanBackend",
+            "target": "StockPlanBackend",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug StockPlanBackend"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:StockPlanBackend}",
+            "name": "Release StockPlanBackend",
+            "target": "StockPlanBackend",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release StockPlanBackend"
+        }
+    ]
+}

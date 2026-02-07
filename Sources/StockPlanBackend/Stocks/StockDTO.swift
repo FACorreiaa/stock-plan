@@ -61,3 +61,18 @@ struct TargetResponse: Content {
     let targetDate: String?
     let rationale: String?
 }
+
+struct StockHistory: Content {
+    let date: String
+    let open: Double
+    let high: Double
+    let low: Double
+    let close: Double
+    let volume: Int
+}
+
+struct StockNews: Content {
+    let title: String
+    let url: String
+    let date: String
+}

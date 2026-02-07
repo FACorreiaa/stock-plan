@@ -24,8 +24,6 @@ public func configure(_ app: Application) async throws {
     app.authRepository = DatabaseAuthRepository()
     app.authService = DefaultAuthService(repo: app.authRepository)
     app.mailer = ConsoleMailerService()
-    app.todoDIRepository = DatabaseTodoDIRepository()
-    app.todoDIService = DefaultTodoDIService(repo: app.todoDIRepository)
 
     let cleanupIntervalMinutes = Environment.get("AUTH_TOKEN_CLEANUP_INTERVAL_MINUTES").flatMap(Int.init(_:)) ?? 60
     app.lifecycle.use(AuthTokenCleanup(interval: TimeInterval(cleanupIntervalMinutes * 60)))

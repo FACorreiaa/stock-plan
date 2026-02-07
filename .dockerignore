@@ -1,2 +1,36 @@
+# Build artifacts
 .build/
 .swiftpm/
+.swiftpm-config/
+.cache/
+.home/
+DerivedData/
+*.xcodeproj
+Packages/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+*.xcuserdata
+
+# Documentation
+docs/
+README.md
+
+# Tests (not needed in production image)
+Tests/
+
+# Environment files (secrets - don't bake into image)
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+
+# Misc
+*.profraw
+db.sqlite
