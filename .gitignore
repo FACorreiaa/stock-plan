@@ -12,3 +12,7 @@ db.sqlite
 .env.*
 !.env.example
 default.profraw
+.vscode/
+.idea/
+*.xcworkspace
+*.xcconfig

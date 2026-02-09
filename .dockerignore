@@ -20,9 +20,6 @@ Packages/
 docs/
 README.md
 
-# Tests (not needed in production image)
-Tests/
-
 # Environment files (secrets - don't bake into image)
 .env
 .env.*

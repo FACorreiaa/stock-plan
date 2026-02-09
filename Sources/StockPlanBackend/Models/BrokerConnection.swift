@@ -1,8 +1,7 @@
 import Fluent
-import Vapor
 import Foundation
 
-final class BrokerConnection: Model, Content, @unchecked Sendable {
+final class BrokerConnection: Model, @unchecked Sendable {
     static let schema = "broker_connections"
 
     @ID(key: .id)

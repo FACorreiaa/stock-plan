@@ -62,10 +62,35 @@ Built for deployment on budget VPS instances like Hetzner's CPX11 ($5/month), th
 - **Real-Time Updates**: WebSocket support for live price streaming
 - **Price Alerts**: Push notifications via APNS when stocks hit target prices
 - **News Integration**: Pull relevant articles/RSS feeds for tracked stocks
+- **Earnings Transcripts**: Attach transcript summaries and key metrics for imported stocks
 - **Paper Trading**: Simulate trades without real money to test strategies
 - **Advanced Analytics**: CAGR, volatility, Sharpe ratio, attribution
 - **Expanded Broker Coverage**: More providers and optional trade execution
 - **Automation**: Scheduled tasks for daily refresh and data maintenance
+
+## MVP Strategy: CSV First, Broker API Second
+
+> **Recommended approach**: Implement CSV import before tackling broker API integration.
+
+| Factor | CSV Import | Broker API |
+|--------|-----------|------------|
+| Complexity | Low - parse standard file | High - OAuth, rate limits, API versioning |
+| Dev time | ~1-2 days | ~1-2 weeks |
+| Dependencies | None | Broker partnership, API keys, legal review |
+| User friction | Manual export/import | One-time auth flow |
+| Testing | Local files | Need sandbox/mock |
+
+**Why CSV first?**
+1. **Validates the data model** - You'll understand exactly what fields matter before building broker integrations
+2. **Delivers value immediately** - Users can start tracking portfolios on day one
+3. **Lower risk** - No external API dependencies or breaking changes
+4. **Learning opportunity** - Build out the Stock, Watchlist, and Target flows before adding complexity
+
+**Next steps after CSV:**
+1. Pick one broker (Interactive Brokers or Alpaca are developer-friendly)
+2. Implement OAuth flow
+3. Sync holdings on-demand
+4. Add scheduled refresh for positions
 
 ## Architecture
 
@@ -82,6 +107,9 @@ Built for deployment on budget VPS instances like Hetzner's CPX11 ($5/month), th
 - **Deployment**: Docker on Hetzner VPS with HTTPS (Let's Encrypt)
 
 ## API Endpoints
+
+All data endpoints require authentication. Get a token from auth endpoints and send:
+- `Authorization: Bearer <token>`
 
 ### Authentication
 - `POST /auth/register` - Create new user account
@@ -113,11 +141,11 @@ Built for deployment on budget VPS instances like Hetzner's CPX11 ($5/month), th
 - `DELETE /targets/:id` - Remove a target
 
 ### Broker Connections
-- `POST /brokers/connect` - Start broker connection flow
 - `GET /brokers` - List connected brokers
-- `POST /brokers/import` - Import holdings (read-only)
-- `POST /brokers/import/csv` - Import holdings from CSV (Content-Type: text/csv)
 - `GET /brokers/holdings` - List imported holdings
+- `POST /brokers/import/csv` - Import holdings from CSV (Content-Type: text/csv)
+- `POST /brokers/import/csv/commit` - Commit CSV import and upsert holdings
+- `POST /brokers/ibkr/sync` - Trigger an IBKR sync run (placeholder for broker API phase)
 
 ### Market Data
 - `GET /history/:symbol` - Fetch historical prices (5/10 year time-series)

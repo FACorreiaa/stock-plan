@@ -3,10 +3,11 @@ import Foundation
 
 struct MarketDataController: RouteCollection {
     func boot(routes: any RoutesBuilder) throws {
-        routes.get("quote", ":symbol", use: quote)
-        routes.get("history", ":symbol", use: history)
-        routes.get("search", use: search)
-        routes.get("fx", use: fx)
+        let protected = routes.grouped(SessionToken.authenticator(), SessionToken.guardMiddleware())
+        protected.get("quote", ":symbol", use: quote)
+        protected.get("history", ":symbol", use: history)
+        protected.get("search", use: search)
+        protected.get("fx", use: fx)
     }
 
     @Sendable

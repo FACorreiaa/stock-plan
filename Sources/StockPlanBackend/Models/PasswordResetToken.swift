@@ -1,8 +1,7 @@
 import Fluent
-import Vapor
 import Foundation
 
-final class PasswordResetToken: Model, Content, @unchecked Sendable {
+final class PasswordResetToken: Model, @unchecked Sendable {
     static let schema = "password_reset_tokens"
 
     @ID(key: .id)

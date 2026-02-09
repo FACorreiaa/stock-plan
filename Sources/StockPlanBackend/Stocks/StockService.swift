@@ -7,6 +7,26 @@ enum StockServiceError: Error {
     case invalidSymbol
 }
 
+extension StockServiceError: AbortError {
+    var status: HTTPResponseStatus {
+        switch self {
+        case .notFound:
+            return .notFound
+        case .invalidSymbol:
+            return .badRequest
+        }
+    }
+
+    var reason: String {
+        switch self {
+        case .notFound:
+            return "Stock not found."
+        case .invalidSymbol:
+            return "Invalid stock symbol."
+        }
+    }
+}
+
 protocol StockService: Sendable {
     func list(userId: UUID, on db: any Database) async throws -> [StockResponse]
     func get(id: UUID, userId: UUID, on db: any Database) async throws -> StockResponse

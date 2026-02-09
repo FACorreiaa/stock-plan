@@ -7,6 +7,10 @@ import JWTKit
 
 // configures your application
 public func configure(_ app: Application) async throws {
+    if app.environment == .testing {
+        app.logger.logLevel = .warning
+    }
+
     // uncomment to serve files from /Public folder
     // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
 
@@ -24,6 +28,10 @@ public func configure(_ app: Application) async throws {
     app.authRepository = DatabaseAuthRepository()
     app.authService = DefaultAuthService(repo: app.authRepository)
     app.mailer = ConsoleMailerService()
+    app.stocksRepository = DatabaseStocksRepository()
+    app.stocksService = StockServiceImpl(repo: app.stocksRepository)
+    app.brokersRepository = DatabaseBrokersRepository()
+    app.brokersService = DefaultBrokersService(repo: app.brokersRepository)
 
     let cleanupIntervalMinutes = Environment.get("AUTH_TOKEN_CLEANUP_INTERVAL_MINUTES").flatMap(Int.init(_:)) ?? 60
     app.lifecycle.use(AuthTokenCleanup(interval: TimeInterval(cleanupIntervalMinutes * 60)))
@@ -46,6 +54,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateTarget())
     app.migrations.add(CreatePriceHistory())
     app.migrations.add(CreateBrokerConnection())
+    app.migrations.add(AddUserScopedQueryIndexes())
 
     // register routes
     try routes(app)

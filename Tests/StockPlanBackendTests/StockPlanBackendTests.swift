@@ -2,6 +2,7 @@
 import VaporTesting
 import Testing
 import Fluent
+import NIOCore
 
 @Suite("App Tests with DB", .serialized)
 struct StockPlanBackendTests {
@@ -102,6 +103,54 @@ struct StockPlanBackendTests {
                 #expect(res.status == .noContent)
                 let model = try await Todo.find(testTodos[0].id, on: app.db)
                 #expect(model == nil)
+            })
+        }
+    }
+
+    @Test("Importing stocks from CSV (commit)")
+    func importStocksFromCsvCommit() async throws {
+        try await withApp { app in
+            let (token, _) = try await registerTestUser(app: app)
+
+            let csv = """
+            symbol,shares,buy_price,buy_date,notes
+            AAPL,12,145.30,2026-01-10,Long-term core
+            """
+
+            var importResponse: CsvImportCommitResponse?
+            try await app.testing().test(.POST, "brokers/import/csv/commit?provider=ibkr", beforeRequest: { req in
+                req.headers.bearerAuthorization = .init(token: token)
+                req.headers.replaceOrAdd(name: .contentType, value: "text/csv")
+                req.body = ByteBufferAllocator().buffer(string: csv)
+            }, afterResponse: { res async throws in
+                #expect(res.status == .ok)
+                importResponse = try res.content.decode(CsvImportCommitResponse.self)
+            })
+
+            #expect(importResponse?.errors.isEmpty == true)
+            #expect(importResponse?.inserted.count == 1)
+            #expect(importResponse?.provider == "ibkr")
+
+            try await app.testing().test(.GET, "brokers", beforeRequest: { req in
+                req.headers.bearerAuthorization = .init(token: token)
+            }, afterResponse: { res async throws in
+                #expect(res.status == .ok)
+                let brokers = try res.content.decode([BrokerConnectionResponse].self)
+                let hasIbkrCsv = brokers.contains { broker in
+                    broker.provider == "ibkr" && broker.status == "csv"
+                }
+                #expect(hasIbkrCsv)
+            })
+
+            try await app.testing().test(.GET, "stocks", beforeRequest: { req in
+                req.headers.bearerAuthorization = .init(token: token)
+            }, afterResponse: { res async throws in
+                #expect(res.status == .ok)
+                let stocks = try res.content.decode([StockResponse].self)
+                let hasAAPL = stocks.contains { stock in
+                    stock.symbol == "AAPL" && stock.shares == 12
+                }
+                #expect(hasAAPL)
             })
         }
     }

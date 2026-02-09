@@ -17,6 +17,14 @@ struct StockResponse: Content {
     let notes: String?
 }
 
+struct Cart: Content, Sendable {
+    var stocks: [Stock]
+
+    init(stocks: [Stock] = []) {
+        self.stocks = stocks
+    }
+}
+
 struct WatchlistItemRequest: Content {
     let symbol: String
 }

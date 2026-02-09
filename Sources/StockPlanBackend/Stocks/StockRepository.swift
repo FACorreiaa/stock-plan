@@ -70,12 +70,26 @@ struct DatabaseStocksRepository: StocksRepository {
     }
 
     private func parseISODateOnly(_ raw: String) throws -> Date {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        guard let date = formatter.date(from: raw) else {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil else {
+            throw Abort(.badRequest, reason: "Invalid buyDate. Expected YYYY-MM-DD.")
+        }
+
+        let parts = trimmed.split(separator: "-")
+        guard
+            parts.count == 3,
+            let year = Int(parts[0]),
+            let month = Int(parts[1]),
+            let day = Int(parts[2])
+        else {
+            throw Abort(.badRequest, reason: "Invalid buyDate. Expected YYYY-MM-DD.")
+        }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        let components = DateComponents(year: year, month: month, day: day)
+
+        guard let date = calendar.date(from: components) else {
             throw Abort(.badRequest, reason: "Invalid buyDate. Expected YYYY-MM-DD.")
         }
         return date
